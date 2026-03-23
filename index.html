@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ボート ピッチ計</title>
+<style>
+body {
+  font-family: sans-serif;
+  text-align: center;
+  padding: 20px;
+  background: #f5f7fa;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+h1 {
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+
+.value-label {
+  font-size: 18px;
+  color: #555;
+  margin-top: 10px;
+}
+
+.value {
+  font-size: 48px;
+  margin: 16px 0 22px;
+  font-weight: bold;
+}
+
+button {
+  font-size: 24px;
+  padding: 30px;
+  margin: 20px auto;
+  width: 92%;
+  max-width: 420px;
+  min-height: 120px;
+  border-radius: 20px;
+  border: none;
+  display: block;
+  color: white;
+  touch-action: manipulation;
+  transition: background 0.2s ease;
+}
+
+.startState {
+  background: #4CAF50;
+}
+
+.stopState {
+  background: #f44336;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+.reset {
+  background: #ccc;
+  color: #222;
+  font-size: 18px;
+  min-height: 64px;
+  padding: 15px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>ボート ピッチ計</h1>
+
+<div class="value-label">3ストローク時間</div>
+<div class="value" id="time">-- ms</div>
+
+<div class="value-label">SPM</div>
+<div class="value" id="spm">--</div>
+
+<button id="mainBtn" class="startState">1本目でタップ開始</button>
+<button class="reset" id="resetBtn">リセット</button>
+
+<script>
+let startTime = null;
+let isMeasuring = false;
+let inputLock = false;
+let lastTouchTime = 0;
+let audioContext = null;
+
+function vibrate(ms = 50) {
+  if (navigator.vibrate) navigator.vibrate(ms);
+}
+
+// 音を使う準備
+function initAudio() {
+  if (!audioContext) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      audioContext = new AudioContextClass();
+    }
+  }
+
+  if (audioContext && audioContext.state === "suspended") {
+    audioContext.resume();
+  }
+}
+
+// 短い「ピッ」音
+function beep(frequency = 880, duration = 0.05, volume = 0.03) {
+  try {
+    initAudio();
+    if (!audioContext) return;
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+
+    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + duration);
+  } catch (e) {
+    // 音が使えない環境でもアプリ自体はそのまま動かす
+  }
+}
+
+function setMainLabel(text) {
+  document.getElementById("mainBtn").textContent = text;
+}
+
+function setButtonState(measuring) {
+  const btn = document.getElementById("mainBtn");
+  if (measuring) {
+    btn.classList.remove("startState");
+    btn.classList.add("stopState");
+  } else {
+    btn.classList.remove("stopState");
+    btn.classList.add("startState");
+  }
+}
+
+function handleMainTap() {
+  if (inputLock) return;
+  inputLock = true;
+  setTimeout(() => { inputLock = false; }, 80);
+
+  // 開始
+  if (!isMeasuring) {
+    startTime = performance.now();
+    isMeasuring = true;
+
+    setMainLabel("計測中… 4本目でタップ停止");
+    setButtonState(true);
+
+    vibrate(50);
+    beep(880, 0.05, 0.04);
+
+    return;
+  }
+
+  // 停止
+  const interval = performance.now() - startTime;
+  const spm = 180000 / interval;
+
+  document.getElementById("time").textContent = Math.round(interval) + " ms";
+  document.getElementById("spm").textContent = spm.toFixed(1);
+
+  vibrate([30, 50, 30]);
+  beep(660, 0.06, 0.05);
+
+  startTime = null;
+  isMeasuring = false;
+
+  setMainLabel("1本目でタップ開始");
+  setButtonState(false);
+}
+
+function resetAll() {
+  startTime = null;
+  isMeasuring = false;
+
+  document.getElementById("time").textContent = "-- ms";
+  document.getElementById("spm").textContent = "--";
+
+  setMainLabel("1本目でタップ開始");
+  setButtonState(false);
+
+  vibrate(20);
+  beep(520, 0.04, 0.03);
+}
+
+const mainBtn = document.getElementById("mainBtn");
+const resetBtn = document.getElementById("resetBtn");
+
+mainBtn.addEventListener("pointerdown", function(e) {
+  e.preventDefault();
+  handleMainTap();
+});
+
+resetBtn.addEventListener("pointerdown", function(e) {
+  e.preventDefault();
+  resetAll();
+});
+
+mainBtn.addEventListener("touchstart", function(e) {
+  e.preventDefault();
+  const now = Date.now();
+  if (now - lastTouchTime < 50) return;
+  lastTouchTime = now;
+  handleMainTap();
+}, { passive: false });
+
+resetBtn.addEventListener("touchstart", function(e) {
+  e.preventDefault();
+  const now = Date.now();
+  if (now - lastTouchTime < 50) return;
+  lastTouchTime = now;
+  resetAll();
+}, { passive: false });
+
+mainBtn.addEventListener("click", e => e.preventDefault());
+resetBtn.addEventListener("click", e => e.preventDefault());
+</script>
+
+</body>
+</html>
