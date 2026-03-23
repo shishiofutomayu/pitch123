@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>ボート ピッチ計</title>
-<link rel="apple-touch-icon" href="icon.png">
+ <link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4CAF50">
+   <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png"> 
   <style>
 body {
@@ -229,6 +233,14 @@ resetBtn.addEventListener("touchstart", function(e) {
 
 mainBtn.addEventListener("click", e => e.preventDefault());
 resetBtn.addEventListener("click", e => e.preventDefault());
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js");
+  });
+}
 </script>
 
 </body>
